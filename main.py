@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import os
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -66,9 +67,9 @@ DAYS_RU = {
     "sun": "Воскресенье",
 }
 
-# === 2. НАСТРОЙКИ БОТА ===
-BOT_TOKEN = "8999667322:AAEdJB4o3rvETcOz7qeKZsKVts5QlU6RM0s"
-CHAT_ID = 1160070078
+# === 2. НАСТРОЙКИ БОТА (Берутся из переменных окружения или значения по умолчанию) ===
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8999667322:AAEdJB4o3rvETcOz7qeKZsKVts5QlU6RM0s")
+CHAT_ID = int(os.getenv("CHAT_ID", "1160070078"))
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -76,8 +77,9 @@ scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
 # === 3. ЛОГИКА ===
 def is_upper_week(date_obj: datetime.date) -> bool:
-  week_num = date_obj.isocalendar().week
-  return week_num % 2 == 0  # Теперь четные недели — НАД ЧЕРТОЙ, нечетные — ПОД ЧЕРТОЙ
+    week_num = date_obj.isocalendar().week
+    # Настроено под ваш вуз (четные недели = НАД ЧЕРТОЙ)
+    return week_num % 2 == 0
 
 def get_day_schedule(date_obj: datetime.date) -> str:
     day_code = date_obj.strftime("%a").lower()[:3]
@@ -124,19 +126,16 @@ async def send_weekly():
 
     await bot.send_message(CHAT_ID, msg, parse_mode=ParseMode.HTML)
 
-# === 4. ТОЧКА ВХОДА ===
+# === 4. ТОЧКА ВХОДА И ЗАПУСК ===
 async def main():
-  scheduler.add_job(send_weekly, "cron", day_of_week="sun", hour=18, minute=0)
-  scheduler.add_job(
-      send_daily, "cron", day_of_week="sun,mon,tue,wed,thu", hour=20, minute=0
-  )
-  scheduler.start()
+    # Еженедельная рассылка в воскресенье в 18:00
+    scheduler.add_job(send_weekly, 'cron', day_of_week='sun', hour=18, minute=0)
+    # Ежедневная рассылка с воскресенья по четверг в 20:00
+    scheduler.add_job(send_daily, 'cron', day_of_week='sun,mon,tue,wed,thu', hour=20, minute=0)
+    scheduler.start()
 
-  # Мгновенная проверка отправки
-  await send_daily()
-  print("Успешно отправлено!")
+    print("Бот успешно запущен на сервере!")
+    await dp.start_polling(bot)
 
-  await dp.start_polling(bot)
-
-
-await main()
+if __name__ == "__main__":
+    asyncio.run(main())
